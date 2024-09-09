@@ -1,4 +1,4 @@
-# NVMeVirt
+# ZTBP ( ZNS Trace Bypass Platform ) based on NVMeVirt
 
 ## Introduction
 
@@ -127,6 +127,10 @@ $ ls -l /dev/nvme*
 crw------- 1 root root 242, 0 Feb 22 14:13 /dev/nvme0
 brw-rw---- 1 root disk 259, 5 Feb 22 14:13 /dev/nvme0n1
 ```
+## ZTBP BenchMark Testing
+```Install BCC
+```cd script_bcc/
+```./biosnoop_nvme.py
 
 
 ## License
