@@ -128,9 +128,9 @@ crw------- 1 root root 242, 0 Feb 22 14:13 /dev/nvme0
 brw-rw---- 1 root disk 259, 5 Feb 22 14:13 /dev/nvme0n1
 ```
 ## ZTBP BenchMark Testing
-```Install BCC
-```cd script_bcc/
-```./biosnoop_nvme.py
+1. Install BCC
+2. cd script_bcc/
+3. ./biosnoop_nvme.py
 
 
 ## License
