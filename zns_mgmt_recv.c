@@ -97,7 +97,6 @@ static bool __check_zmgmt_rcv_option_supported(struct zns_ftl *zns_ftl,
 {
 	if (lba_to_zone(zns_ftl, cmd->slba) >= zns_ftl->zp.nr_zones) {
 		NVMEV_ERROR("Invalid lba range\n");
-		return false;
 	}
 
 	if (cmd->zra != 0) {
@@ -125,7 +124,7 @@ void zns_zmgmt_recv(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev
 	uint32_t status;
 
 	NVMEV_ZNS_DEBUG("%s slba 0x%llx nr_dw 0x%lx  action %u partial %u action_specific 0x%x\n",
-			__func__, cmd->slba, length, cmd->zra, cmd->zra_specific_features,
+			__FUNCTION__, cmd->slba, length, cmd->zra, cmd->zra_specific_features,
 			cmd->zra_specific_field);
 
 	if (__check_zmgmt_rcv_option_supported(zns_ftl, cmd)) {

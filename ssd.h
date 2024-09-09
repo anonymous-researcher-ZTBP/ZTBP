@@ -177,6 +177,7 @@ struct ssdparams {
 	int fw_wbuf_lat0; /* Firmware overhead0 of write buffer in nanoseconds */
 	int fw_wbuf_lat1; /* Firmware overhead1 of write buffer in nanoseconds */
 	int fw_ch_xfer_lat; /* Firmware overhead of nand channel data transfer(4KB) in nanoseconds */
+	int fw_rd_buf_lat; /* Using clustering idea, it can covered with long latency */
 
 	uint64_t ch_bandwidth; /*NAND CH Maximum bandwidth in MiB/s*/
 	uint64_t pcie_bandwidth; /*PCIE Maximum bandwidth in MiB/s*/

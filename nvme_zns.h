@@ -105,6 +105,8 @@ struct zone_descriptor {
 	__u64 zslba; // zone start logical block address
 	__u64 wp;
 
+//	__u64 read_cnt; // zone read count
+
 	__u32 rsvd[8];
 };
 

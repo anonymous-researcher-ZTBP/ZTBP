@@ -66,7 +66,6 @@ static void check_params(struct ssdparams *spp)
 void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 {
 	uint64_t blk_size, total_size;
-
 	spp->secsz = 512;
 	spp->secs_per_pg = 8;
 	spp->pgsz = spp->secsz * spp->secs_per_pg;
@@ -121,6 +120,7 @@ void ssd_init_params(struct ssdparams *spp, uint64_t capacity, uint32_t nparts)
 	spp->fw_ch_xfer_lat = FW_CH_XFER_LATENCY;
 	spp->fw_wbuf_lat0 = FW_WBUF_LATENCY0;
 	spp->fw_wbuf_lat1 = FW_WBUF_LATENCY1;
+	spp->fw_rd_buf_lat = FW_READ_BUF_LATENCY;
 
 	spp->ch_bandwidth = NAND_CHANNEL_BANDWIDTH;
 	spp->pcie_bandwidth = PCIE_BANDWIDTH;

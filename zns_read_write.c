@@ -4,6 +4,11 @@
 #include "ssd.h"
 #include "zns_ftl.h"
 
+//#include "znslrucache.h"
+#include <asm/unaligned.h>
+
+#define ZONE_CLUSTER_FEATURE
+
 void schedule_internal_operation(int sqid, unsigned long long nsecs_target,
 				 struct buffer *write_buffer, size_t buffs_to_release);
 
@@ -37,7 +42,7 @@ static void __increase_write_ptr(struct zns_ftl *zns_ftl, uint32_t zid, uint32_t
 
 		change_zone_state(zns_ftl, zid, ZONE_STATE_FULL);
 	} else if (cur_write_ptr > (zone_to_slba(zns_ftl, zid) + zone_capacity)) {
-		NVMEV_ERROR("[%s] Write Boundary error!!\n", __func__);
+		NVMEV_ERROR("[%s] Write Boundary error!!\n", __FUNCTION__);
 	}
 }
 
@@ -95,9 +100,10 @@ static bool __zns_write(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 	slpn = lba_to_lpn(zns_ftl, slba);
 	elpn = lba_to_lpn(zns_ftl, slba + nr_lba - 1);
 	zone_elpn = zone_to_elpn(zns_ftl, zid);
-
-	NVMEV_ZNS_DEBUG("%s slba 0x%llx nr_lba 0x%lx zone_id %d state %d\n", __func__, slba,
+#if 0
+	NVMEV_ZNS_READ_DEBUG("%s slba 0x%llx nr_lba 0x%lx zone_id %d state %d\n", __FUNCTION__, slba,
 			nr_lba, zid, state);
+#endif	
 
 	if (zns_ftl->zp.zone_wb_size)
 		write_buffer = &(zns_ftl->zone_write_buffer[zid]);
@@ -121,7 +127,7 @@ static bool __zns_write(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 	// check if slba == current write pointer
 	if (slba != zone_descs[zid].wp) {
 		NVMEV_ERROR("%s WP error slba 0x%llx nr_lba 0x%llx zone_id %d wp %llx state %d\n",
-			    __func__, slba, nr_lba, zid, zns_ftl->zone_descs[zid].wp, state);
+			    __FUNCTION__, slba, nr_lba, zid, zns_ftl->zone_descs[zid].wp, state);
 		status = NVME_SC_ZNS_INVALID_WRITE;
 		goto out;
 	}
@@ -199,8 +205,10 @@ static bool __zns_write(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 			uint64_t nsecs_completed = ssd_advance_nand(zns_ftl->ssd, &swr);
 
 			nsecs_latest = max(nsecs_completed, nsecs_latest);
-			NVMEV_ZNS_DEBUG("%s Flush slba 0x%llx nr_lba 0x%lx zone_id %d state %d\n",
-					__func__, slba, nr_lba, zid, state);
+#if 0
+			NVMEV_ZNS_READ_DEBUG("%s Flush slba 0x%llx nr_lba 0x%lx zone_id %d state %d\n",
+					__FUNCTION__, slba, nr_lba, zid, state);
+#endif			
 
 			if (((lpn + pgs - 1) == zone_elpn) && (unaligned_space > 0))
 				bufs_to_release = unaligned_space;
@@ -257,7 +265,7 @@ static bool __zns_write_zrwa(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 
 	NVMEV_DEBUG(
 		"%s slba 0x%llx nr_lba 0x%llx zone_id %d state %d wp 0x%llx zrwa_impl_start 0x%llx zrwa_impl_end 0x%llx  buffer %lu\n",
-		__func__, slba, nr_lba, zid, state, prev_wp, zrwa_impl_start, zrwa_impl_end,
+		__FUNCTION__, slba, nr_lba, zid, state, prev_wp, zrwa_impl_start, zrwa_impl_end,
 		zns_ftl->zwra_buffer[zid].remaining);
 
 	if ((LBA_TO_BYTE(nr_lba) % spp->write_unit_size) != 0) {
@@ -274,7 +282,7 @@ static bool __zns_write_zrwa(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 	// valid range : wp <=  <= wp + 2*(size of zwra) -1
 	if (slba < zone_descs[zid].wp || elba > zrwa_impl_end) {
 		NVMEV_ERROR("%s slba 0x%llx nr_lba 0x%llx zone_id %d wp 0x%llx state %d\n",
-			    __func__, slba, nr_lba, zid, zone_descs[zid].wp, state);
+			    __FUNCTION__, slba, nr_lba, zid, zone_descs[zid].wp, state);
 		status = NVME_SC_ZNS_INVALID_WRITE;
 		goto out;
 	}
@@ -318,14 +326,14 @@ static bool __zns_write_zrwa(struct zns_ftl *zns_ftl, struct nvmev_request *req,
 				lbas_per_zrwafg;
 
 		NVMEV_DEBUG("%s implicitly flush zid %d wp before 0x%llx after 0x%llx buffer %lu",
-			    __func__, zid, prev_wp, zone_descs[zid].wp + nr_lbas_flush,
+			    __FUNCTION__, zid, prev_wp, zone_descs[zid].wp + nr_lbas_flush,
 			    zns_ftl->zwra_buffer[zid].remaining);
 	} else if (elba == zone_to_elba(zns_ftl, zid)) {
 		// Workaround. move wp to end of the zone and make state full implicitly
 		nr_lbas_flush = elba - prev_wp + 1;
 
 		NVMEV_DEBUG("%s end of zone zid %d wp before 0x%llx after 0x%llx buffer %lu",
-			    __func__, zid, prev_wp, zone_descs[zid].wp + nr_lbas_flush,
+			    __FUNCTION__, zid, prev_wp, zone_descs[zid].wp + nr_lbas_flush,
 			    zns_ftl->zwra_buffer[zid].remaining);
 	}
 
@@ -390,14 +398,81 @@ bool zns_write(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resu
 	// get zone from start_lba
 	uint32_t zid = lpn_to_zone(zns_ftl, slpn);
 
-	NVMEV_DEBUG("%s slba 0x%llx zone_id %d \n", __func__, cmd->slba, zid);
+	NVMEV_DEBUG("%s slba 0x%llx zone_id %d \n", __FUNCTION__, cmd->slba, zid);
 
 	if (zone_descs[zid].zrwav == 0)
 		return __zns_write(zns_ftl, req, ret);
 	else
 		return __zns_write_zrwa(zns_ftl, req, ret);
 }
+void indexSort(struct zone_descriptor *zone_descs, int indexes[], int size) {
+    int i, j, temp;
 
+    // 인덱스 배열 초기화
+    for (i = 0; i < size; i++) {
+        indexes[i] = i;
+    }
+
+    // 삽입 정렬을 사용하여 인덱스 정렬
+    for (i = 1; i < size; i++) {
+        j = i;
+        while (j > 0 && zone_descs[indexes[j - 1]].rsvd[0] < zone_descs[indexes[j]].rsvd[0]) {
+            // 인덱스 스왑
+            temp = indexes[j];
+            indexes[j] = indexes[j - 1];
+            indexes[j - 1] = temp;
+            j--;
+        }
+    }
+#if 0
+    for (i=0 ; i<size;i++){
+	    NVMEV_ZNS_READ_DEBUG("zid = %d, read_zone_cnt=%d",i,zone_descs[i].rsvd[0]);
+	    NVMEV_ZNS_READ_DEBUG("index = %d, index_inner=%d",i,indexes[i]);
+    }
+#endif    
+}
+
+void zns_cluster_check_op(struct nvmev_ns *ns,struct nvmev_result *ret){
+
+	struct zns_ftl *zns_ftl = (struct zns_ftl*)ns->ftls;
+	struct zone_cluster_infos *res_infos = zns_ftl->zone_cluster_cnt;
+	struct zone_descriptor *zone_descs = zns_ftl->zone_descs;
+
+	uint32_t size = zns_ftl->zp.nr_zones;
+	uint32_t indexs[size];
+
+	indexSort(zone_descs,indexs,size);
+
+	int max_zid = ZONE_LBA_CLUSTERING;
+	int i;
+	//sorted index zone id
+	for (i=0;i < ZONE_LBA_CLUSTERING ;i++){
+		zns_ftl->clustering_zone[i] = indexs[i];
+		//ret->zone_cluster[i] = indexs[i];
+		NVMEV_ZNS_READ_DEBUG("%s[after index sort] selected zone id=%d\n",__FUNCTION__, indexs[i]);
+	}
+	zns_ftl->enable_cluster = 1;
+
+	//zone read count set to zero
+	for (i=0;i < size ;i++){
+		zns_ftl->zone_descs[i].rsvd[0] = 0;
+	}
+}
+bool check_cluster_zone(struct zns_ftl *zns_ftl,uint32_t zid){
+	int max_cluster = sizeof(nvmev_vdev->cluster_info)/sizeof(nvmev_vdev->cluster_info[0]);	
+	
+	int i;
+	//NVMEV_ZNS_READ_DEBUG("check zid%d",zid);
+	for (i=0;i<max_cluster;i++){
+		if (nvmev_vdev->cluster_info[i].zid == zid){
+			nvmev_vdev->cluster_info[i].read_cnt +=1;
+//			nvmev_vdev->cluster_info[i].hit_ratio = (int)(nvmev_vdev->cluster_info[i].read_cnt/nvmev_vdev->tot_rd_cnt);
+//			NVMEV_ZNS_READ_DEBUG("%s true..... ",__FUNCTION__);
+			return true;
+		}
+	}
+	return false;
+}
 bool zns_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_result *ret)
 {
 	struct zns_ftl *zns_ftl = (struct zns_ftl *)ns->ftls;
@@ -421,24 +496,138 @@ bool zns_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 	struct ppa ppa;
 	struct nand_cmd swr;
 
-	NVMEV_ZNS_DEBUG(
+	uint64_t rlpn = get_unaligned_le64(req->cmd->common.cdw10);
+#if 0
+	NVMEV_ZNS_READ_DEBUG(
 		"%s slba 0x%llx nr_lba 0x%lx zone_id %d state %d wp 0x%llx last lba 0x%llx\n",
-		__func__, slba, nr_lba, zid, zone_descs[zid].state, zone_descs[zid].wp,
-		(slba + nr_lba - 1));
+		__FUNCTION__, slba, nr_lba, zid, zone_descs[zid].state, zone_descs[zid].wp,(slba + nr_lba - 1));
+#endif
+#if 0	
+	int i = 0;
+	for (i = 0;i<5;i++){	
+		NVMEV_ZNS_READ_DEBUG("zns clustering information =%d",nvmev_vdev->cluster_info[i]);
+	}
+#endif
 
+#if 0	
 	if (zone_descs[zid].state == ZONE_STATE_OFFLINE) {
 		status = NVME_SC_ZNS_ERR_OFFLINE;
 	} else if (__check_boundary_error(zns_ftl, slba, nr_lba) == false) {
 		// return boundary error
 		status = NVME_SC_ZNS_ERR_BOUNDARY;
 	}
+#endif
 
 	// get delay from nand model
 	nsecs_latest = nsecs_start;
-	if (LBA_TO_BYTE(nr_lba) <= KB(4))
-		nsecs_latest += spp->fw_4kb_rd_lat;
-	else
+#if 0	
+	if (LBA_TO_BYTE(nr_lba) <= KB(4)){
+		nsecs_latest += (spp->fw_4kb_rd_lat*1000*10);//10us
+//		NVMEV_ZNS_READ_DEBUG(
+//			"%s nsecs_latest =%llu, spp->fw_4kb_rd_lat =%llu start=%llu \n",__FUNCTION__,nsecs_latest,spp->fw_4kb_rd_lat,req->nsecs_start);
+	}else{
 		nsecs_latest += spp->fw_rd_lat;
+	}
+#endif	
+//	NVMEV_ZNS_READ_DEBUG("slba %llu , zone_id %d\n",slba,zid);
+#ifdef ZONE_CLUSTER_FEATURE
+	if ( nvmev_vdev->en_cluster_chk == true ){
+	
+		if (status == NVME_SC_SUCCESS){
+			nvmev_vdev->tot_rd_cnt +=1;
+			int priority = -1;
+			if (check_cluster_zone(zns_ftl,zid)){
+				priority = 1; 
+//				NVMEV_ZNS_READ_DEBUG("slba %llu , zone_id %d\n",slba,zid);
+			}else{
+				priority = 2;
+			}
+			if (get(zns_ftl->cache, slba)==-1){
+				nvmev_vdev->tot_fail_hit_cnt +=1;
+				put(zns_ftl->cache, slba,10,priority);
+
+				if (LBA_TO_BYTE(nr_lba) <= KB(4)){
+					nsecs_latest += (spp->fw_4kb_rd_lat*1000*1000);//1000us
+				}else{
+					nsecs_latest += (spp->fw_rd_lat*1000*1000);//1000us
+				}
+			}else{
+				nvmev_vdev->tot_hit_cnt +=1;
+				nsecs_latest += (spp->fw_rd_lat*1000); // 1us
+			}
+		}
+
+	}else{
+		if (status == NVME_SC_SUCCESS){
+			nvmev_vdev->tot_rd_cnt +=1;
+			int priority = 1;
+			if (get(zns_ftl->cache, slba)==-1){
+				nvmev_vdev->tot_fail_hit_cnt +=1;
+				put(zns_ftl->cache, slba,10,priority);
+
+				if (LBA_TO_BYTE(nr_lba) <= KB(4)){
+					nsecs_latest += (spp->fw_4kb_rd_lat*1000*1000);//1000us
+				}else{
+					nsecs_latest += (spp->fw_rd_lat*1000*1000);//1000us
+				}
+			}else{
+				nvmev_vdev->tot_hit_cnt +=1;
+				nsecs_latest += (spp->fw_rd_lat*1000); // 1us
+			}
+		}
+	}
+#else
+
+#if 0
+	if (status == NVME_SC_SUCCESS){
+		nvmev_vdev->tot_rd_cnt +=1;
+		
+                if (get(zns_ftl->cache, slba)==-1){
+			nvmev_vdev->tot_fail_hit_cnt +=1;
+                        put(zns_ftl->cache, slba,10,0);
+
+			if (LBA_TO_BYTE(nr_lba) <= KB(4)){
+				nsecs_latest += (spp->fw_4kb_rd_lat*1000*1000);//1000us
+			}else{
+				nsecs_latest += (spp->fw_rd_lat*1000*1000);//1000us
+			}
+                }else{
+			nvmev_vdev->tot_hit_cnt +=1;
+			nsecs_latest += (spp->fw_rd_lat*1000); // 1us 
+                }
+	}
+#endif
+
+#endif
+
+#if 1	
+	if (nvmev_vdev->tot_rd_cnt % 1000000 ==0){
+		NVMEV_ZNS_READ_DEBUG("-------------------\n");
+		NVMEV_ZNS_READ_DEBUG("Fail cnt= %llu",nvmev_vdev->tot_fail_hit_cnt);
+		NVMEV_ZNS_READ_DEBUG("Hit cnt= %llu",nvmev_vdev->tot_hit_cnt);
+		NVMEV_ZNS_READ_DEBUG("Total read cnt= %llu\n",nvmev_vdev->tot_rd_cnt);
+		NVMEV_ZNS_READ_DEBUG("size of cache= %llu\n",zns_ftl->cache->size);
+		NVMEV_ZNS_READ_DEBUG("-------------------\n");
+		nvmev_vdev->tot_fail_hit_cnt = 0;
+		nvmev_vdev->tot_hit_cnt = 0;
+		nvmev_vdev->tot_rd_cnt = 0;
+#if 0
+		if (nvmev_vdev->tot_rd_cnt % 1000000 == 0){
+			if(nvmev_vdev->tot_rd_cnt>0 && nvmev_vdev->tot_hit_cnt>0){
+				nvmev_vdev->tot_hit_ratio = (int)(nvmev_vdev->tot_hit_cnt*100/nvmev_vdev->tot_rd_cnt);
+
+				if (nvmev_vdev->tot_hit_ratio < ZONE_MIN_HIT_RATIO){
+					nvmev_vdev->en_cluster_chk = false;
+				}
+				nvmev_vdev->tot_rd_cnt = 0;
+				nvmev_vdev->tot_fail_hit_cnt = 0;
+				nvmev_vdev->tot_hit_cnt = 0;
+			}
+		}
+#endif		
+	}
+#endif
+	//nsecs_latest = 10;
 
 	swr.type = USER_IO;
 	swr.cmd = NAND_READ;
@@ -459,7 +648,7 @@ bool zns_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 		nsecs_completed = ssd_advance_pcie(zns_ftl->ssd, nsecs_latest, nr_lba * spp->secsz);
 		nsecs_latest = (nsecs_completed > nsecs_latest) ? nsecs_completed : nsecs_latest;
 	}
-
+	//nsecs_latest = 10;
 	ret->status = status;
 	ret->nsecs_target = nsecs_latest;
 	return true;

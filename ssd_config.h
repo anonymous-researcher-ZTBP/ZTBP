@@ -184,7 +184,7 @@ static_assert((ZONE_SIZE % DIES_PER_ZONE) == 0);
 /*In an emulator environment, it may be too large to run an application
   which requires a certain number of zones or more.
   So, adjust the zone size to fit your environment */
-#define ZONE_SIZE GB(2ULL)
+#define ZONE_SIZE MB(32)
 
 static_assert((ONESHOT_PAGE_SIZE % FLASH_PAGE_SIZE) == 0);
 
@@ -194,19 +194,20 @@ static_assert((ONESHOT_PAGE_SIZE % FLASH_PAGE_SIZE) == 0);
 #define NAND_CHANNEL_BANDWIDTH (450ull) //MB/s
 #define PCIE_BANDWIDTH (3050ull) //MB/s
 
-#define NAND_4KB_READ_LATENCY_LSB (50000)
-#define NAND_4KB_READ_LATENCY_MSB (50000)
-#define NAND_4KB_READ_LATENCY_CSB (50000)
-#define NAND_READ_LATENCY_LSB (58000)
-#define NAND_READ_LATENCY_MSB (58000)
-#define NAND_READ_LATENCY_CSB (58000)
-#define NAND_PROG_LATENCY (561000)
+#define NAND_4KB_READ_LATENCY_LSB (5000)
+#define NAND_4KB_READ_LATENCY_MSB (5000)
+#define NAND_4KB_READ_LATENCY_CSB (5000)
+#define NAND_READ_LATENCY_LSB (5800)
+#define NAND_READ_LATENCY_MSB (5800)
+#define NAND_READ_LATENCY_CSB (5800)
+#define NAND_PROG_LATENCY (1)
 #define NAND_ERASE_LATENCY (0)
 
-#define FW_4KB_READ_LATENCY (20000)
-#define FW_READ_LATENCY (13000)
-#define FW_WBUF_LATENCY0 (5600)
+#define FW_4KB_READ_LATENCY (1)
+#define FW_READ_LATENCY (130)
+#define FW_WBUF_LATENCY0 (56)
 #define FW_WBUF_LATENCY1 (600)
+#define FW_READ_BUF_LATENCY (1)
 #define FW_CH_XFER_LATENCY (0)
 #define OP_AREA_PERCENT (0)
 

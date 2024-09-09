@@ -6,8 +6,18 @@
 #include <linux/types.h>
 #include "nvmev.h"
 #include "nvme_zns.h"
+#include "znslrucache.h"
 
-#define NVMEV_ZNS_DEBUG(string, args...) //printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
+//define NVMEV_DRV_ZNS_NAME "Nvmev_ZNS"
+#define NVMEV_ZNS_DEBUG(string, args...) //printk(KERN_INFO "%s: " string, NVMEV_DRV_ZNS_NAME, ##args)
+//#define NVMEV_ZNS_READ_DEBUG(string, args ...) printk(KERN_INFO "%s: "string, NVMEV_DRV_ZNS_NAME, ##args)
+
+#define ZONE_CLUSTER_FEATURE
+#define ZONE_LBA_CLUSTERING 5
+#define ZONE_MIN_HIT_RATIO 30
+#define ZONE_TOT_FAIL_CNT 5
+#define ZONE_CHK_RD_CNT 100000
+
 
 // Zoned Namespace Command Set Specification Revision 1.1a
 struct znsparams {
@@ -31,6 +41,9 @@ struct zone_resource_info {
 	__u32 acquired_cnt;
 	__u32 total_cnt;
 };
+struct zone_cluster_infos {
+	__u32 read_cnt;
+};
 
 struct zns_ftl {
 	struct ssd *ssd;
@@ -42,6 +55,14 @@ struct zns_ftl {
 	struct buffer *zone_write_buffer;
 	struct buffer *zwra_buffer;
 	void *storage_base_addr;
+
+	//for zns clustering information...	
+	uint32_t enable_cluster;
+	uint32_t clustering_zone[ZONE_LBA_CLUSTERING];
+	uint32_t tot_rd_cnt;
+	struct zone_cluster_infos *zone_cluster_cnt;
+	LRUCache* cache;
+	
 };
 
 /* zns internal functions */

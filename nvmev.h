@@ -13,33 +13,24 @@
 #undef CONFIG_NVMEV_FAST_X86_IRQ_HANDLING
 
 #undef CONFIG_NVMEV_VERBOSE
-#undef CONFIG_NVMEV_DEBUG
 #undef CONFIG_NVMEV_DEBUG_VERBOSE
 
 /*************************/
 #define NVMEV_DRV_NAME "NVMeVirt"
-#define NVMEV_VERSION 0x0110
-#define NVMEV_DEVICE_ID	NVMEV_VERSION
-#define NVMEV_VENDOR_ID 0x0c51
-#define NVMEV_SUBSYSTEM_ID	0x370d
-#define NVMEV_SUBSYSTEM_VENDOR_ID NVMEV_VENDOR_ID
 
 #define NVMEV_INFO(string, args...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
 #define NVMEV_ERROR(string, args...) printk(KERN_ERR "%s: " string, NVMEV_DRV_NAME, ##args)
 #define NVMEV_ASSERT(x) BUG_ON((!(x)))
 
-#ifdef CONFIG_NVMEV_DEBUG
-#define  NVMEV_DEBUG(string, args...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
 #ifdef CONFIG_NVMEV_DEBUG_VERBOSE
-#define  NVMEV_DEBUG_VERBOSE(string, args...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
-#else
-#define  NVMEV_DEBUG_VERBOSE(string, args...)
-#endif
+#define NVMEV_DEBUG(string, args...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
 #else
 #define NVMEV_DEBUG(string, args...)
-#define NVMEV_DEBUG_VERBOSE(string, args...)
 #endif
 
+
+#define NVMEV_ZNS_CLUSTER_DEBUG(string, args...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
+#define NVMEV_ZNS_ADMIN_DEBUG(string,args ...) printk(KERN_INFO "%s: " string, NVMEV_DRV_NAME, ##args)
 
 #define NR_MAX_IO_QUEUE 72
 #define NR_MAX_PARALLEL_IO 16384
@@ -81,7 +72,7 @@ struct nvmev_sq_stat {
 struct nvmev_submission_queue {
 	int qid;
 	int cqid;
-	int priority;
+	int sq_priority;
 	bool phys_contig;
 
 	int queue_size;
@@ -120,6 +111,8 @@ struct nvmev_admin_queue {
 
 	struct nvme_command __iomem **nvme_sq;
 	struct nvme_completion __iomem **nvme_cq;
+
+	u32 cluster_info[5];
 };
 
 #define NR_SQE_PER_PAGE (PAGE_SIZE / sizeof(struct nvme_command))
@@ -138,14 +131,14 @@ struct nvmev_config {
 	unsigned long storage_start; //byte
 	unsigned long storage_size; // byte
 
-	unsigned int cpu_nr_dispatcher;
-	unsigned int nr_io_workers;
-	unsigned int cpu_nr_io_workers[32];
-
-	/* TODO Refactoring storage configurations */
 	unsigned int nr_io_units;
 	unsigned int io_unit_shift; // 2^
 
+	unsigned int cpu_nr_dispatcher;
+	unsigned int nr_io_cpu;
+	unsigned int cpu_nr_io_workers[32];
+
+	/* TODO Refactoring storage configurations */
 	unsigned int read_delay; // ns
 	unsigned int read_time; // ns
 	unsigned int read_trailing; // ns
@@ -154,7 +147,7 @@ struct nvmev_config {
 	unsigned int write_trailing; // ns
 };
 
-struct nvmev_io_work {
+struct nvmev_proc_table {
 	int sqid;
 	int cqid;
 
@@ -183,21 +176,26 @@ struct nvmev_io_work {
 	unsigned int next, prev;
 };
 
-struct nvmev_io_worker {
-	struct nvmev_io_work *work_queue;
+struct nvmev_proc_info {
+	struct nvmev_proc_table *proc_table;
 
 	unsigned int free_seq; /* free io req head index */
 	unsigned int free_seq_end; /* free io req tail index */
 	unsigned int io_seq; /* io req head index */
 	unsigned int io_seq_end; /* io req tail index */
 
-	unsigned long long latest_nsecs;
+	unsigned long long proc_io_nsecs;
 
 	unsigned int id;
-	struct task_struct *task_struct;
+	struct task_struct *nvmev_io_worker;
 	char thread_name[32];
 };
-
+#define ZONE_CLUSTER_NUM 5
+struct zone_cluster_info{
+	unsigned int read_cnt;
+	unsigned int zid;
+	unsigned int hit_ratio;
+};
 struct nvmev_dev {
 	struct pci_bus *virt_bus;
 	void *virtDev;
@@ -205,17 +203,20 @@ struct nvmev_dev {
 	struct pci_pm_cap *pmcap;
 	struct pci_msix_cap *msixcap;
 	struct pcie_cap *pciecap;
-	struct pci_ext_cap *extcap;
+	struct aer_cap *aercap;
+	struct pci_exp_hdr *pcie_exp_cap;
 
 	struct pci_dev *pdev;
+	struct pci_ops pci_ops;
+	struct pci_sysdata pci_sysdata;
 
 	struct nvmev_config config;
-	struct task_struct *nvmev_dispatcher;
+	struct task_struct *nvmev_manager;
 
 	void *storage_mapped;
 
-	struct nvmev_io_worker *io_workers;
-	unsigned int io_worker_turn;
+	struct nvmev_proc_info *proc_info;
+	unsigned int proc_turn;
 
 	void __iomem *msix_table;
 
@@ -243,9 +244,17 @@ struct nvmev_dev {
 	struct proc_dir_entry *proc_write_times;
 	struct proc_dir_entry *proc_io_units;
 	struct proc_dir_entry *proc_stat;
-	struct proc_dir_entry *proc_debug;
 
 	unsigned long long *io_unit_stat;
+
+//get information from host operation
+	struct zone_cluster_info cluster_info[ZONE_CLUSTER_NUM];
+	uint64_t tot_rd_cnt;
+	uint64_t tot_fail_hit_cnt;
+	uint64_t tot_hit_cnt; 
+	bool en_cluster_chk;
+	uint64_t tot_hit_ratio;
+
 };
 
 struct nvmev_request {
@@ -257,6 +266,7 @@ struct nvmev_request {
 struct nvmev_result {
 	uint32_t status;
 	uint64_t nsecs_target;
+	uint64_t zone_cluster_hit_ratio[ZONE_CLUSTER_NUM];
 };
 
 struct nvmev_ns {
@@ -295,8 +305,8 @@ void nvmev_proc_admin_sq(int new_db, int old_db);
 void nvmev_proc_admin_cq(int new_db, int old_db);
 
 // OPS I/O QUEUE
-void NVMEV_IO_WORKER_INIT(struct nvmev_dev *nvmev_vdev);
-void NVMEV_IO_WORKER_FINAL(struct nvmev_dev *nvmev_vdev);
+void NVMEV_IO_PROC_INIT(struct nvmev_dev *nvmev_vdev);
+void NVMEV_IO_PROC_FINAL(struct nvmev_dev *nvmev_vdev);
 int nvmev_proc_io_sq(int qid, int new_db, int old_db);
 void nvmev_proc_io_cq(int qid, int new_db, int old_db);
 

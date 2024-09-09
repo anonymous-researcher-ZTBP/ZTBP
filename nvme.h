@@ -100,13 +100,7 @@ struct nvme_id_ctrl {
 	__u8 mdts;
 	__le16 cntlid;
 	__le32 ver;
-	__le32 rtd3r;
-	__le32 rtd3e;
-	__le32 oaes;
-	__le32 ctratt;
-	__le16 rrls;
-	__u8 cntrltype;
-	__u8 rsvd84[153];
+	__u8 rsvd84[172];
 	__le16 oacs;
 	__u8 acl;
 	__u8 aerl;
@@ -319,15 +313,7 @@ struct nvme_reservation_status {
 	op(nvme_cmd_resv_release, 0x15)		\
 	op(nvme_cmd_zone_mgmt_send, 0x79)	\
 	op(nvme_cmd_zone_mgmt_recv, 0x7a)	\
-	op(nvme_cmd_zone_append, 0x7d) \
-	op(nvme_cmd_kv_store, 0x81) \
-	op(nvme_cmd_kv_append, 0x83) \
-	op(nvme_cmd_kv_retrieve, 0x90) \
-	op(nvme_cmd_kv_delete, 0xA1) \
-	op(nvme_cmd_kv_iter_req, 0xB1) \
-	op(nvme_cmd_kv_iter_read, 0xB2) \
-	op(nvme_cmd_kv_exist, 0xB3) \
-	op(nvme_cmd_kv_batch, 0x85) \
+	op(nvme_cmd_zone_append, 0x7d)
 
 #define ENUM_NVME_OP(name, value) name = value,
 #define STRING_NVME_OP(name, value) [name] = #name,
@@ -353,6 +339,14 @@ struct nvme_common_command {
 	__le64 prp1;
 	__le64 prp2;
 	__le32 cdw10[6];
+//for use zns clustering info	
+#if 0
+	__le32 cdw11[1];
+	__le32 cdw12[1];
+	__le32 cdw13[1];
+	__le32 cdw14[1];
+	__le32 cdw15[1];
+#endif
 };
 
 struct nvme_rw_command {
@@ -478,6 +472,8 @@ enum nvme_admin_opcode {
 	nvme_admin_sanitize_nvm = 0x84,
 	nvme_admin_get_lba_status = 0x86,
 	nvme_admin_vendor_start = 0xC0,
+//for zns clustering info send
+	nvme_admin_zns_cluster_info = 0x99,
 };
 
 enum {

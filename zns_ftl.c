@@ -7,6 +7,9 @@
 #include "ssd.h"
 #include "zns_ftl.h"
 
+//zns clustering info
+//#include "znslrucache.h"
+
 static void __init_descriptor(struct zns_ftl *zns_ftl)
 {
 	struct zone_descriptor *zone_descs;
@@ -45,9 +48,20 @@ static void __init_descriptor(struct zns_ftl *zns_ftl)
 		if (zone_wb_size)
 			buffer_init(&(zns_ftl->zone_write_buffer[i]), zone_wb_size);
 
+		//zone clustering set to zero
+		zone_descs[i].rsvd[0] = 0;
+
 		NVMEV_ZNS_DEBUG("[i] zslba 0x%llx zone capacity 0x%llx\n", zone_descs[i].zslba,
 				zone_descs[i].zone_capacity);
 	}
+	//LRUCache simulation enable
+//	int tran_4k_addr_off = (ZONE_SIZE/1024/1024)*ZONE_LBA_CLUSTERING*1024/4;
+	int cache_1M = 256;
+	int cache_64M = 16384;
+	int cache_128M = 32768;
+	int cache_256M = 65536;
+	int cache_512M = 131072;
+	zns_ftl->cache = createLRUCache(cache_64M);	
 }
 
 static void __remove_descriptor(struct zns_ftl *zns_ftl)
@@ -60,6 +74,8 @@ static void __remove_descriptor(struct zns_ftl *zns_ftl)
 
 	kfree(zns_ftl->report_buffer);
 	kfree(zns_ftl->zone_descs);
+	
+	freeLRUCache(zns_ftl->cache);
 }
 
 static void __init_resource(struct zns_ftl *zns_ftl)
@@ -80,6 +96,18 @@ static void __init_resource(struct zns_ftl *zns_ftl)
 		.total_cnt = zns_ftl->zp.nr_zones,
 		.acquired_cnt = 0,
 	};
+}
+
+static void __init_cluster_resource(struct zns_ftl *zns_ftl)
+{
+	struct zone_cluster_infos *res_infos = zns_ftl->zone_cluster_cnt;
+	int i = 0;
+	for (i = 0;i<zns_ftl->zp.nr_zones;i++)
+	{
+		res_infos[i] = (struct zone_cluster_infos){
+			.read_cnt = 0,
+		};
+	}
 }
 
 static void zns_init_params(struct znsparams *zpp, struct ssdparams *spp, uint64_t capacity)
@@ -119,6 +147,7 @@ static void zns_init_ftl(struct zns_ftl *zns_ftl, struct znsparams *zpp, struct 
 
 	__init_descriptor(zns_ftl);
 	__init_resource(zns_ftl);
+//	__init_cluster_resource(zns_ftl);
 }
 
 void zns_init_namespace(struct nvmev_ns *ns, uint32_t id, uint64_t size, void *mapped_addr,
@@ -180,7 +209,7 @@ static void zns_flush(struct nvmev_ns *ns, struct nvmev_request *req, struct nvm
 		latest = max(latest, ssd_next_idle_time(zns_ftl[i].ssd));
 	}
 
-	NVMEV_DEBUG("%s latency=%llu\n", __func__, latest - start);
+	NVMEV_DEBUG("%s latency=%llu\n", __FUNCTION__, latest - start);
 
 	ret->status = NVME_SC_SUCCESS;
 	ret->nsecs_target = latest;
@@ -201,6 +230,7 @@ bool zns_proc_nvme_io_cmd(struct nvmev_ns *ns, struct nvmev_request *req, struct
 			return false;
 		break;
 	case nvme_cmd_read:
+//		NVMEV_ZNS_READ_DEBUG("zns read io");
 		if (!zns_read(ns, req, ret))
 			return false;
 		break;
