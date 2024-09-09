@@ -1,0 +1,53 @@
+[global]
+ioengine=io_uring
+direct=1
+bs=4k
+iodepth=4
+numjobs=6
+do_verify=0
+verify=0
+runtime = 30
+time_based
+group_reporting
+
+[normal-random]
+#stonewall
+rw=randread
+filename = /dev/nvme1n1
+offset=10M
+size=1014M
+
+[zone-randread 2]
+#stonewall
+rw=randread
+filename=/dev/nvme1n1
+offset=32M
+size=32M
+
+[zone-randread 8]
+#stonewall
+rw=randread
+filename=/dev/nvme1n1
+offset=224M
+size=32M
+
+[zone-randread 12]
+#stonewall
+rw=randread
+filename=/dev/nvme1n1
+offset=352M
+size=32M
+
+[zone-randread 16]
+#stonewall
+rw=randread
+filename=/dev/nvme1n1
+offset=480M
+size=32M
+
+[zone-randread 20]
+#stonewall
+rw=randread
+filename=/dev/nvme1n1
+offset=608M
+size=32M
