@@ -19,7 +19,7 @@ After following the NVMeVirt installation steps, proceed with the following ZTBP
 
 1. Clone this repository:
    ```
-   git clone https://github.com/sanghunejung/ZTBP.git
+   git clone https://github.com/anoymous-researcher-ZTBP/ZTBP.git
    cd ZTBP
    ```
 
@@ -85,7 +85,7 @@ For full license texts, please refer to the [LICENSE](LICENSE) and [pqueue/LICEN
 
 ## Contact
 
-For any questions or support regarding ZTBP, please contact sanghune.jung@gmail.com.
+For any questions or support regarding ZTBP, please contact "".
 
 ## Acknowledgments
 
