@@ -542,16 +542,24 @@ bool zns_read(struct nvmev_ns *ns, struct nvmev_request *req, struct nvmev_resul
 			}else{
 				priority = 2;
 			}
+//After SLC migiration sceanrio...
+						
 			if (get(zns_ftl->cache, slba)==-1){
 				nvmev_vdev->tot_fail_hit_cnt +=1;
 				put(zns_ftl->cache, slba,10,priority);
 
-				if (LBA_TO_BYTE(nr_lba) <= KB(4)){
-					nsecs_latest += (spp->fw_4kb_rd_lat*1000*1000);//1000us
+				if (priority == 1){
+					nsecs_latest += (spp->fw_4kb_rd_lat*1000*7);//7us
 				}else{
-					nsecs_latest += (spp->fw_rd_lat*1000*1000);//1000us
+					if (LBA_TO_BYTE(nr_lba) <= KB(4)){
+						nsecs_latest += (spp->fw_4kb_rd_lat*1000*1000);//1000us
+					}else{
+						nsecs_latest += (spp->fw_rd_lat*1000*1000);//1000us
+					}
 				}
-			}else{
+
+			}
+			else{
 				nvmev_vdev->tot_hit_cnt +=1;
 				nsecs_latest += (spp->fw_rd_lat*1000); // 1us
 			}
