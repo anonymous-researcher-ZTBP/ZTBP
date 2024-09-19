@@ -72,8 +72,6 @@ Contributions to ZTBP are welcome. Please feel free to submit pull requests or o
 
 ## License
 
-## License
-
 ZTBP is based on NVMeVirt and follows its licensing terms:
 
 1. The main project is offered under the terms of the GNU General Public License version 2 (GPLv2) as published by the Free Software Foundation. For more information about this license, please visit [GNU GPL v2](https://www.gnu.org/licenses/old-licenses/gpl-2.0.en.html).
@@ -92,7 +90,6 @@ For any questions or support regarding ZTBP, please contact sanghune.jung@gmail.
 ## Acknowledgments
 
 - This project is based on [NVMeVirt](https://github.com/nvmevirt/nvmevirt).
-- [Any other acknowledgments or credits]
-```
+
 
 
